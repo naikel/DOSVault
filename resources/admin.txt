@@ -1,0 +1,8 @@
+game: DOSVault Configuration Tool
+sort_title: _DOSVault Configuration Tool_
+file: admin.sh
+developer: TheScorpius666
+release: 2024
+description: Administration tool for DOSVault.
+  .
+  You can uninstall games and reset keyboard map files with this.

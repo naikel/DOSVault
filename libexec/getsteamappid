@@ -1,0 +1,39 @@
+#!/usr/bin/python3
+
+import re
+import sys
+import vdf
+import struct
+
+if len(sys.argv) != 3:
+    print("Usage: getsteamappid <flatpak-id> <shortcuts.vdf>")
+    exit(1)
+    
+flatpak_id = sys.argv[1]
+vdf_file = sys.argv[2]
+
+# Helpers
+int32 = struct.Struct('<i')
+uint32 = struct.Struct('<I')
+
+f = open(vdf_file, mode='rb')
+s = f.read()
+f.close()
+d = vdf.binary_loads(s)
+
+i = 0
+while str(i) in d['shortcuts']:
+    app = d['shortcuts'][str(i)]
+    if re.match(r".*" + flatpak_id + ".desktop$", app['ShortcutPath']):
+        p = int32.pack(app['appid'])
+        app_id = uint32.unpack(p)[0]
+        print (f"{app_id}")
+        exit(0)
+
+    i = i + 1
+
+print("0")
+exit(1)
+
+    
+

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=DOSVault
+GenericName=Steam Deck/Linux port of the eXoDOS using Pegasus as a frontend
+Comment=Steam Deck/Linux port of the eXoDOS catalog using Pegasus as a frontend
+Exec=/app/bin/run.sh
+Icon=com.yappari.DOSVault
+Terminal=false
+Categories=Game;Player;
+Keywords=emulator;retro;game;videogame;video game;player;

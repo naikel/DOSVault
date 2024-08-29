@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+
+from datetime import datetime
+import xml.etree.ElementTree as ET
+import os
+import sys
+import re
+
+all_image_files = []
+
+def print_collection(launch_file_path):
+
+    print("collection: DOS")
+    print("launch: " + launch_file_path + " {file.path}")
+    print()
+
+
+def get_all_files(directory):
+    for root, dirs, files in os.walk(directory):
+        for filename in files:
+            all_image_files.append(os.path.join(root, filename))
+
+           
+def search_files(target_string):
+    for filename in all_image_files:
+        if target_string in filename:
+            image_file = re.sub(r"^.*eXoDOS/Images/", "Images/", filename)
+            
+            asset=''
+            if (re.match(r".*/Screenshot - Gameplay/.*", image_file)):
+                asset="asset.screenshot"
+            elif (re.match(r".*/Box - Back/.*", image_file)):
+                asset="asset.box_back"
+            elif (re.match(r".*/Box - Front/.*", image_file)):
+                asset="asset.box_front"
+            elif (re.match(r".*/Screenshot - Game Title/.*", image_file)):
+                asset="asset.titlescreen"
+            elif (re.match(r".*/Clear Logo/.*", image_file)):
+                asset="asset.logo"
+            elif (re.match(r".*/(Fanart - )?Background/.*", image_file)):
+                asset="asset.background"
+            elif (re.match(r".*/(Fanart - )?Disc/.*", image_file)):
+                asset="asset.disc"
+            elif (re.match(r".*/(Fanart - )?Banner/.*", image_file)):
+                asset="asset.banner"
+            
+            if asset != '':
+                print(f"{asset}: {image_file}")
+            else:
+                print(f"x-asset: {image_file}")
+                    
+
+if len(sys.argv) != 4:
+    print("Usage: xml2pegasus <xml-file> <dosvault-dir> <launch.sh>")
+    exit(1)
+   
+xml_file = sys.argv[1]
+dosvault_dir = sys.argv[2]
+launch_file_path = sys.argv[3]
+
+tree = ET.parse(xml_file)
+root = tree.getroot()
+
+print_collection(launch_file_path)
+
+get_all_files(dosvault_dir + "/eXoDOS/Images/")
+i = 0
+print("\033[s", file=sys.stderr)
+for game in root.findall("Game"):
+    title = game.find("Title").text
+    dt_object = datetime.fromisoformat(game.find("ReleaseDate").text)
+    year = dt_object.year
+    file = game.find("RootFolder").text.replace("\\","/") + '/dosbox.conf'
+    developer = game.find("Developer").text
+    publisher = game.find("Publisher").text
+    genre = game.find("Genre").text
+    notes = game.find("Notes").text
+    if notes is not None:
+        description = game.find("Notes").text.replace("\n\n", "\n").replace("\n", "\n  .\n  ")
+    else:
+        description = ''
+    rating_pct = int(float(game.find("CommunityStarRating").text)*20)
+    rating = f"{rating_pct}%"
+
+    print(f"game: {title}")
+    print(f"sort_title: {title}")
+    print(f"file: {file}")
+    print(f"developer: {developer}")
+    print(f"release: {year}")
+    print(f"description: {description}")
+    print(f"rating: {rating}")
+    print(f"x-scrape-source: xml2pegasus")
+    search_files(re.sub(r'[<>:"/\|?*]', "_", (title + "-01")))
+    print()
+    i = i + 1
+    print(f"\033[u{i}", file=sys.stderr)
+
