@@ -1,4 +1,4 @@
-game: DOSVault Configuration Tool
+game: DOSVault Configuration Tool v@VERSION@
 sort_title: _DOSVault Configuration Tool_
 file: admin.sh
 developer: TheScorpius666

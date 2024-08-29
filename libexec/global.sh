@@ -81,6 +81,20 @@ update_grid() {
     done
 }
 
+upgrade_version() {
+    if [ -f "${xml_file}" ]; then
+        if [ ! -f "${dosvault_dir}/VERSION" ]; then
+            touch "${dosvault_dir}/VERSION"
+        fi
+
+        last_version=$(cat "${dosvault_dir}/VERSION")
+        if [ "{$last_version}" -ne ${dosvault_version} ]; then
+            sed -i "s/game: DOSVault Configuration Tool.*/game: DOSVault Configuration Tool v${dosvault_version}/" ${xml_file}
+            echo "${dosvault_version}" >"${dosvault_dir}/VERSION"
+        fi
+    fi
+}
+
 # steam_deck: true if this is a Steam Deck
 if [[ -f "/sys/devices/virtual/dmi/id/product_name" &&  $(cat /sys/devices/virtual/dmi/id/product_name) =~ ^(Jupiter|Galileo)$ ]]; then
     steam_deck=true
@@ -99,5 +113,8 @@ fi
 
 read_config
 
- 
-
+if [ -f "${lib_dir}/version.sh" ]; then
+    source "${lib_dir}/version.sh"
+else
+    dosvault-version="unknown"
+fi

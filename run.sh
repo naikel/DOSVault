@@ -31,6 +31,7 @@ fi
 
 # If it was installed correctly in the previous step, let's run pegasus
 if [ -f $xml_file ]; then
+    upgrade_version
     LC_ALL=en_US.UTF-8 pegasus-fe
 fi
 

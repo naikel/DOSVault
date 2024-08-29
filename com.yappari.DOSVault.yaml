@@ -182,6 +182,7 @@ modules:
       - install -Dm755 install.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 install_game.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 admin.sh ${FLATPAK_DEST}/libexec
+      - install -Dm755 version.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 xml2pegasus ${FLATPAK_DEST}/libexec
       - install -Dm755 getsteamappid ${FLATPAK_DEST}/libexec
     sources:

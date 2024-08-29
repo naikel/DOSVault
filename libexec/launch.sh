@@ -58,7 +58,9 @@ if [ -d "${game_install_dir}" ]; then
     fi
     
     if [ "${steam_deck}" = "true" -a "${XDG_CURRENT_DESKTOP}" = "gamescope" ]; then
-        dosbox_options='-set "sdl windowresolution=1280x800" -set "sdl showmenu=false"'
+        cd $HOME
+        resolution=$(flatpak-spawn --host xrandr -display :0 | head -1 | grep -Eo "current [0-9]+ x [0-9]+" | sed 's/current//' | tr -d [:space:])
+        dosbox_options="-set windowresolution=${resolution} -set showmenu=false"
     else
         dosbox_options="-fullscreen"
     fi
