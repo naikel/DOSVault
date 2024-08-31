@@ -69,7 +69,6 @@ choose_install_dir() {
             done
         else
             # This is a Linux box
-            
             success=
             while [ -z "$success" ]; do
                 str="\nPress any $key_string to choose a folder in which to install DOSVault\n"

@@ -90,7 +90,7 @@ for game in root.findall("Game"):
     print(f"description: {description}")
     print(f"rating: {rating}")
     print(f"x-scrape-source: xml2pegasus")
-    search_files(re.sub(r'[<>:"/\|?*]', "_", (title + "-01")))
+    search_files("/" + re.sub(r'[<>:"/\|?*]', "_", (title + "-01")))
     print()
     i = i + 1
     print(f"\033[u{i}", file=sys.stderr)

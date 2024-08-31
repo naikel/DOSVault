@@ -107,6 +107,112 @@ index b72a191ec..a1caab159 100644
                  render.fullFrame = true;
              else
                  render.fullFrame = false;
+diff --git a/src/gui/sdl_mapper.cpp b/src/gui/sdl_mapper.cpp
+index 52cb83bee..ad64325a1 100644
+--- a/src/gui/sdl_mapper.cpp
++++ b/src/gui/sdl_mapper.cpp
+@@ -2660,14 +2660,14 @@ protected:
+     void DrawTextAuto(const char* text, bool centered, uint8_t foreground, uint8_t background)
+     {
+         const auto size = strlen(text);
+-        const auto wide = dx / 8;
++        const auto wide = dx / 16;
+         const auto data = dx > 0 && size > wide ? std::string(text, wide - 3) + std::string("...") : std::string(text);
+ 
+         if(centered)
+         {
+             const auto size = data.size();
+-            const auto xPos = std::max(x, (Bitu) (x + dx / 2 - size * 8 / 2));
+-            const auto yPos = std::max(y, y + dy / 2 - 14 / 2);
++            const auto xPos = std::max(x, (Bitu) (x + dx / 2 - size * 16 / 2));
++            const auto yPos = std::max(y, y + dy / 2 - 28 / 2);
+             DrawText(1 + xPos, yPos, data.c_str(), foreground, background);
+         }
+         else
+@@ -3768,23 +3768,25 @@ static void DrawText(Bitu x,Bitu y,const char * text,uint8_t color,uint8_t bkcol
+             font = &int10_font_14_init[c*14];
+         else if (prvmc!=1)
+             font = &int10_font_14[c*14];
+-        Bitu i,j;
++        Bitu i,j,h;
+         for (int k=0; k<(prvmc?2:1); k++) {
+             uint8_t * draw_line = draw;
+             for (i=0;i<14;i++) {
+-                uint8_t map=*(font+(prvmc==1?(i*2+k):i));
+-                for (j=0;j<8;j++) {
+-                    if (map & 0x80) *(draw_line+j)=color;
+-                    else *(draw_line+j)=bkcolor;
+-                    map<<=1;
++                for (h=0; h<2; h++) {
++                    uint8_t map=*(font+(prvmc==1?(i*2+k):i));
++                    for (j=0;j<16;j+=2) {
++                        if (map & 0x80) { *(draw_line+j)=color; *(draw_line+j+1)=color; }
++                        else { *(draw_line+j)=bkcolor; *(draw_line+j+1)=bkcolor; }
++                        map<<=1;
++                    }
++    #if defined(C_SDL2)
++                    draw_line+=mapper.draw_surface->w;
++    #else
++                    draw_line+=mapper.surface->pitch;
++    #endif
+                 }
+-#if defined(C_SDL2)
+-                draw_line+=mapper.draw_surface->w;
+-#else
+-                draw_line+=mapper.surface->pitch;
+-#endif
+             }
+-            draw+=8;
++            draw+=16;
+         }
+         text++;
+         prvmc = 0;
+@@ -3986,8 +3988,8 @@ static void CreateLayout(void) {
+ #define DY 10
+ #define MX 1
+ #define MY 1
+-#define BW 27
+-#define BH 18
++#define BW 54
++#define BH 36
+ #define CX (BW / 2)
+ #define CY (BH / 2)
+ #define BU(_X_) (BW * (_X_) + MX * ((_X_) - 1))
+@@ -5345,17 +5347,21 @@ void MAPPER_RunInternal() {
+ 
+     /* Be sure that there is no update in progress */
+     GFX_EndUpdate(nullptr);
++    
++    int width = std::max(1280, sdl.surface->w);
++    int height = std::max(800, sdl.surface->h);
++
+ #if defined(C_SDL2)
+     void GFX_SetResizeable(bool enable);
+     GFX_SetResizeable(false);
+-    mapper.window = OpenGL_using() ? GFX_SetSDLWindowMode(640,480,SCREEN_OPENGL) : GFX_SetSDLSurfaceWindow(640,480);
++    mapper.window = OpenGL_using() ? GFX_SetSDLWindowMode(width, height, SCREEN_OPENGL) : GFX_SetSDLSurfaceWindow(width, height);
+     if (mapper.window == NULL) E_Exit("Could not initialize video mode for mapper: %s",SDL_GetError());
+     mapper.surface=SDL_GetWindowSurface(mapper.window);
+     if (mapper.surface == NULL) E_Exit("Could not initialize video mode for mapper: %s",SDL_GetError());
+-    mapper.draw_surface=SDL_CreateRGBSurface(0,640,480,8,0,0,0,0);
++    mapper.draw_surface=SDL_CreateRGBSurface(0, width, height, 8, 0, 0, 0, 0);
+     // Needed for SDL_BlitScaled
+-    mapper.draw_surface_nonpaletted=SDL_CreateRGBSurface(0,640,480,32,0x0000ff00,0x00ff0000,0xff000000,0);
+-    mapper.draw_rect=GFX_GetSDLSurfaceSubwindowDims(640,480);
++    mapper.draw_surface_nonpaletted=SDL_CreateRGBSurface(0, width, height, 32, 0x0000ff00, 0x00ff0000, 0xff000000, 0);
++    mapper.draw_rect=GFX_GetSDLSurfaceSubwindowDims(width, height);
+     // Sorry, but SDL_SetSurfacePalette requires a full palette.
+     SDL_Palette *sdl2_map_pal_ptr = SDL_AllocPalette(256);
+     SDL_SetPaletteColors(sdl2_map_pal_ptr, map_pal, 0, 7);
+@@ -5365,7 +5371,7 @@ void MAPPER_RunInternal() {
+         last_clicked=NULL;
+     }
+ #else
+-    mapper.surface=SDL_SetVideoMode(640,480,8,0);
++    mapper.surface=SDL_SetVideoMode(width, height, 8, 0);
+     if (mapper.surface == NULL) E_Exit("Could not initialize video mode for mapper: %s",SDL_GetError());
+ 
+     /* Set some palette entries */
 diff --git a/src/gui/sdlmain.cpp b/src/gui/sdlmain.cpp
 index 7f93f4c97..14d1e0762 100644
 --- a/src/gui/sdlmain.cpp
