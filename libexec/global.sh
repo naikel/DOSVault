@@ -88,7 +88,7 @@ upgrade_version() {
         fi
 
         last_version=$(cat "${dosvault_dir}/VERSION")
-        if [ "{$last_version}" -ne ${dosvault_version} ]; then
+        if [ "{$last_version}" != "${dosvault_version}" ]; then
             sed -i "s/game: DOSVault Configuration Tool.*/game: DOSVault Configuration Tool v${dosvault_version}/" ${xml_file}
             echo "${dosvault_version}" >"${dosvault_dir}/VERSION"
         fi
@@ -116,5 +116,5 @@ read_config
 if [ -f "${lib_dir}/version.sh" ]; then
     source "${lib_dir}/version.sh"
 else
-    dosvault-version="unknown"
+    dosvault_version="unknown"
 fi

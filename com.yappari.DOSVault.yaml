@@ -32,6 +32,17 @@ cleanup:
 
 modules:
 
+  # Build aria2
+  - name: aria2
+    buildsystem: simple
+    build-commands:
+      - autoreconf -i
+      - ./configure --prefix=/app
+      - make install
+    sources:
+      - type: git
+        url: https://github.com/aria2/aria2.git
+
   # Build Mesa GLU
   - name: glue
     buildsystem: autotools
@@ -68,25 +79,6 @@ modules:
       stable-only: true
       tag-template: v$version
 
-  # Build DOSBox-X SDL2
-  - name: dosbox-x
-    buildsystem: autotools
-    config-opts:
-      - --enable-core-inline
-      - --enable-sdl2
-    sources:
-      - type: git
-        url: https://github.com/joncampbell123/dosbox-x
-        tag: "dosbox-x-v2024.07.01"
-    x-checker-data:
-      type: anitya
-      project-id: 242383
-      stable-only: true
-      tag-template: dosbox-x-v$version
-    post-install:
-      - install -Dm644 /app/share/icons/hicolor/scalable/apps/dosbox-x.svg /app/share/icons/hicolor/scalable/apps/com.dosbox_x.DOSBox-X.svg
-      - desktop-file-edit --set-key=Icon --set-value=com.dosbox_x.DOSBox-X.desktop /app/share/applications/com.dosbox_x.DOSBox-X.desktop
-
   # Build libXmu - needed for xterm
   - name: libXmu
     buildsystem: autotools
@@ -113,17 +105,26 @@ modules:
         url: https://github.com/ThomasDickey/xterm-snapshots.git
         tag: "xterm-393"
 
-  # Build aria2
-  - name: aria2
-    buildsystem: simple
-    build-commands:
-      - autoreconf -i
-      - ./configure --prefix=/app
-      - make install
+  # Build DOSBox-X SDL2
+  - name: dosbox-x
+    buildsystem: autotools
+    config-opts:
+      - --enable-core-inline
+      - --enable-sdl2
     sources:
       - type: git
-        url: https://github.com/aria2/aria2.git
-        tag: "release-1.37.0"
+        url: https://github.com/joncampbell123/dosbox-x
+        tag: "dosbox-x-v2024.07.01"
+      - type: patch
+        path: dosbox-x.patch
+    x-checker-data:
+      type: anitya
+      project-id: 242383
+      stable-only: true
+      tag-template: dosbox-x-v$version
+    post-install:
+      - install -Dm644 /app/share/icons/hicolor/scalable/apps/dosbox-x.svg /app/share/icons/hicolor/scalable/apps/com.dosbox_x.DOSBox-X.svg
+      - desktop-file-edit --set-key=Icon --set-value=com.dosbox_x.DOSBox-X.desktop /app/share/applications/com.dosbox_x.DOSBox-X.desktop
 
   # Build Pegasus
   - name: pegasus-frontend
