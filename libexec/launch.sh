@@ -22,8 +22,8 @@ source $lib_dir/global.sh
 
 # Check if the user selected the administration tool
 
-if [ "$(basename "$1")" = "admin.sh" ]; then
-    $1
+if [ "$(basename "$1")" = "adminTool" ]; then
+    LC_ALL=en_US.UTF-8 uxterm $xterm_mode -e "$1" ${base_dir}
     exit 0
 fi
 
@@ -40,7 +40,7 @@ if [ ! -d "${game_install_dir}" ]; then
     real_name="$(echo "${base_name}" | sed "s/.zip$//")"
 
     echo ${real_name} is not installed
-    LC_ALL=en_US.UTF-8 uxterm $xterm_mode -geom 85x26 -fg gray -bg black -fa 'DejaVu Sans Mono' -fs 19 -e /bin/bash $lib_dir/install_game.sh "${base_name}" "$1"
+    LC_ALL=en_US.UTF-8 uxterm $xterm_mode -e /bin/bash $lib_dir/install_game.sh "${base_name}" "$1"
 fi
 
 # Launch the game if it's installed

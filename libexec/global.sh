@@ -110,6 +110,7 @@ else
     sdcard=
     xterm_mode=
 fi
+xterm_mode="${xterm_mode} -geom 85x26 -fg gray -bg black -fa DejaVuSansMono -fs 19"
 
 read_config
 

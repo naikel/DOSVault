@@ -1,0 +1,503 @@
+#!/usr/bin/python3
+
+import shutil
+import curses
+import math
+import sys
+import os
+import re
+import contextlib
+
+from curses import panel
+
+# PyGame is SO unprofessional
+with contextlib.redirect_stdout(None):
+    with contextlib.redirect_stderr(None):
+        import pygame
+        
+def read_config_file(config_file):
+
+    global config
+
+    with open(config_file, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            if line[0] != '#':
+                (key, value) = line.split("=")
+                value = value.replace('\n','')
+                config[key] = value
+
+def get_key_or_button(device):
+    
+    global gamepad
+    global stdscr
+
+    key = None
+    while key is None:
+        # Let's try the keyboard first
+        try:                       
+            ch = device.getch()
+            if ch != curses.ERR:
+                match ch:
+                    case 27: 
+                        ch = device.getch()
+                        if ch == curses.ERR:
+                            key = "escape"
+                        elif (ch == 91):
+                            ch = device.getch() 
+                            match ch:
+                                case 65:
+                                    key = "up"
+                                case 66:
+                                    key = "down"
+                                case 67:
+                                    key = "right"
+                                case 68:
+                                    key = "left"
+                                case _:
+                                    key = "unknown"
+                    case 10: 
+                        key = "enter"
+                    case _:
+                        key = chr(ch)          
+                    
+        except Exception as err:
+            stdscr.addstr(0, 0, str(err))
+            
+        if key is not None:
+            return key
+    
+        if gamepad is not None:
+            for event in pygame.event.get():
+                if event.type == pygame.JOYBUTTONUP:
+                    match event.button:
+                        case 0:
+                            key = "enter"
+                        case 1:
+                            key = "back"
+                        case _:
+                            key = "unknown"
+                elif event.type == pygame.JOYHATMOTION: 
+                    x, y = event.value
+                    match y:
+                        case 1:
+                            key = "up"
+                        case -1:
+                            key = "down"
+                    match x:
+                        case 1:
+                            key = "right"
+                        case -1:
+                            key = "left"
+            
+    return key
+    
+
+def center_text(row, color, text):
+    stdscr.addstr(row, curses.COLS // 2 - len(text) // 2, text, color)
+    
+    
+def show_title(res_dir):
+    curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
+    color = curses.color_pair(2)
+    with open(res_dir + "/title.txt", 'r') as f:
+        lines = f.readlines()
+        y = 0
+        for line in lines:
+            center_text(y, color | curses.A_BOLD, line)
+            y = y + 1
+            
+
+def message_box(message, yesno=False):
+    buttons = [
+        { 'text': " Yes  ", 'x': 0, 'win': None },
+        { 'text': "  No  ", 'x': 0, 'win': None }
+    ]
+    
+    try:
+        w = 55
+        h = 9
+        topX = (curses.COLS // 2) - (w // 2)
+        topY = (curses.LINES // 2) - (h // 2)
+
+        # Draw message box dialog
+        msgWindow = curses.newwin(h, w, topY, topX)
+        msgPanel = panel.new_panel(msgWindow)
+        msgWindow.bkgd(' ', curses.color_pair(2) | curses.A_BOLD)
+        msgWindow.box()
+        msgWindow.nodelay(True)
+        option_str = " Message "
+        msgWindow.addstr(0, w // 2 - len(option_str) // 2, option_str)
+        color = curses.color_pair(3)
+        lines = message.split('\n')
+
+        i = 0
+        for line in lines:
+            msgWindow.addstr(i + 2, w // 2 - len(line[:w-2]) // 2, line[:w-2], color)
+            i = i + 1
+
+        msgWindow.refresh()
+        
+        # Draw buttons
+        buttonW = 8
+        buttonH = 3
+        if yesno is False:
+            n = 1
+            buttons[0]['text'] = "  OK  "
+            buttons[0]['x'] = (curses.COLS // 2) - (buttonW // 2)
+        else:
+            n = 2
+            buttons[0]['x'] = (curses.COLS // 2) - ((w - 30) // 3) - (buttonW // 2)
+            buttons[1]['x'] = (curses.COLS // 2) + ((w - 30) // 3) - (buttonW // 2)
+
+        buttonY = topY + h - 4
+
+        for b in range(0, n):
+            buttons[b]['win'] = curses.newwin(buttonH, buttonW, buttonY, buttons[b]['x'])
+            buttons[b]['win'].box()
+ 
+ 
+        # Wait for input
+        b_selected = 0       
+        while True:
+            for b in range(0, n):
+                if b == b_selected:
+                    attr = curses.A_REVERSE | color
+                else:
+                    attr = color
+                buttons[b]['win'].addstr(1, buttonW // 2 - len(buttons[b]['text']) // 2, buttons[b]['text'], attr)
+                buttons[b]['win'].refresh()
+            
+            key = get_key_or_button(msgWindow)
+            match key:
+                case "back":
+                    msgPanel.hide()
+                    return False
+                case "enter":
+                    msgPanel.hide()
+                    return b_selected == 0
+                case "left":
+                    if b_selected > 0:
+                        b_selected = b_selected - 1
+                case "right":
+                    if b_selected < n - 1:
+                        b_selected = b_selected + 1
+                        
+
+    except Exception as err:
+        stdscr.addstr(0,0,str(err)+str(i))
+              
+       
+def get_installed_games():
+    global exodos_dir
+
+    games = []
+    for game_dir in os.scandir(exodos_dir):
+        if os.path.isdir(game_dir.path) and game_dir.name != "!dos":
+            for file in os.scandir(game_dir.path):
+                if re.match(r".*\.exo$", file.name):
+                    entry = {}
+                    entry['name'] = re.sub(r"\.exo$", "", file.name)
+                    entry['dir'] = game_dir.name
+                    games.append(entry)
+    return games                   
+                       
+            
+def select_game():
+   
+    games = get_installed_games()
+    try:
+
+        # Show the selection pad        
+        if len(games) > 0:
+            w = 55
+            h = min(20, len(games) + 2)
+            topX = (curses.COLS // 2) - (w // 2)
+            topY = (curses.LINES // 2) - (h // 2)
+
+            selectWindow = curses.newwin(h, w, topY, topX)
+            selectPad = curses.newpad(len(games), w)
+            selectPanel = panel.new_panel(selectWindow)
+            selectWindow.bkgd(' ', curses.color_pair(1))
+            selectWindow.box()
+            selectWindow.nodelay(True)
+            option_str = " Select a game "
+            selectWindow.addstr(0, w // 2 - len(option_str) // 2, option_str)
+            selectWindow.refresh()
+            color = curses.color_pair(3)
+            selected = 0
+            padY = 0
+            quit = False
+            abort = False
+            while quit is False:
+                i = 0
+                for game in games:
+                    if i == selected:
+                        attr = curses.A_REVERSE | color
+                    else:
+                        attr = color
+                    selectPad.addstr(i, w // 2 - len(game['name'][:w-2]) // 2, game['name'][:w-2], attr)
+                    i = i + 1
+                
+                selectPad.refresh(padY, 0, topY + 1, topX + 1, topY + h - 2, topX + w - 2)
+                key = get_key_or_button(selectWindow)
+                match key:
+                    case "up":
+                        if selected > 0:
+                            selected = selected - 1
+                            if selected < padY:
+                                padY = padY - 1
+                    case "down":
+                        if selected < len(games) - 1:
+                            selected = selected + 1
+                            if selected > padY + h - 3:
+                                padY = padY + 1
+                    case "enter":
+                        quit = True
+                    case "back":
+                        abort = True
+                        quit = True
+                    case "escape":
+                        abort = True
+                        quit = True
+                        
+                        
+            selectPanel.hide()
+            if abort is True:
+                return None
+            else:
+                return games[selected]
+
+        else:
+            message_box("You haven't installed a game yet!")
+            
+            
+    except Exception as err:
+        stdscr.addstr(0,0,str(err)+str(i))
+
+
+def rebuild_installed_xml_file(silent=False):
+    global installed_xml_file
+    global lib_dir
+    global exodos_dir
+    
+    games = get_installed_games()
+    if os.path.exists(installed_xml_file):
+        os.remove(installed_xml_file)
+        
+    with open(installed_xml_file, 'w') as f:
+        f.write("collection: Installed\n")
+        f.write(f"launch: {lib_dir}/launch.sh\n")
+        f.write(f"file: {lib_dir}/adminTool\n")
+        
+        for game in games:
+            f.write(f"file: {exodos_dir}/!dos/{game['dir']}/dosbox.conf\n")
+            
+    if silent is False:            
+        message_box("The database has been rebuilt", False)
+    
+
+def reset_game_mapping():
+    game = select_game()
+    if game is not None:
+        mapper_file = f"{exodos_dir}/!dos/{game['dir']}/mapper.map"
+        if os.path.exists(mapper_file):
+            if message_box(f"Are you sure you want\nto reset the mapping for\n{game['name']}?", True) is True:
+                os.remove(mapper_file)
+        else:
+            message_box("This game already has the default\n mapping configured!")
+            
+
+def reset_all_mappings():
+    if message_box(f"Are you sure you want to reset ALL game mappings?", True) is True:
+        games = get_installed_games()
+        for game in games:
+            mapper_file = f"{exodos_dir}/!dos/{game['dir']}/mapper.map"
+            if os.path.exists(mapper_file):
+                os.remove(mapper_file)
+        message_box("All game mappings have been reset!")
+        
+def uninstall_game():
+    game = select_game()
+    if game is not None:
+        install_dir = f"{exodos_dir}/{game['dir']}"
+        if os.path.exists(install_dir):
+            if message_box(f"Are you sure you want to uninstall\n{game['name']}?", True) is True:
+                shutil.rmtree(install_dir)
+                rebuild_installed_xml_file(True)
+                message_box(f"{game['name']}\nhas been uninstalled")
+                
+
+def uninstall_exodos():
+    global config_file
+    global dosvault_dir
+
+    if message_box(f"Are you sure you want to uninstall\nall your eXoDOS games?", True) is True:
+        games = get_installed_games()
+        if len(games) > 0 and message_box(f"You have {len(games)} game(s) installed!\nAre you REALLY SURE you want to uninstall\nall your eXoDOS games?", True, True) is True:
+            # Remove the whole DOSVault directory
+            if os.path.exists(dosvault_dir):
+                shutil.rmtree(dosvault_dir)
+            
+            # Delete config file
+            if os.path.exists(config_file):
+                os.remove(config_file)
+            
+            # Kill Pegasus?
+            
+            # Exit configuration tool, no longer needed
+            message_box("eXoDOS has been uninstalled.\n \nSee you soon!")
+            return True
+    return False                    
+            
+def main_menu():
+    global stdscr    
+    
+    selected = 0
+    options = [
+        "Rebuild installed games database",
+        "Reset mapping of a game",
+        "Reset all mappings",
+        "Uninstall a game",
+        "Uninstall eXoDOS",
+        "Exit"
+    ]
+    w = 40
+    h = len(options) + 2
+
+    try:
+        topX = (curses.COLS // 2) - (w // 2)
+        topY = (curses.LINES // 2) - (h // 2)
+        mainWindow = curses.newwin(h, w, topY, topX)
+        mainPanel = panel.new_panel(mainWindow)
+        curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        color = curses.color_pair(3)
+        mainWindow.bkgd(' ', curses.color_pair(1))
+        mainWindow.box()
+        mainWindow.nodelay(True)
+        
+        option_str = " Select an option "
+        mainWindow.addstr(0, w // 2 - len(option_str) // 2, option_str)
+        stdscr.refresh()
+        
+        quit = False
+        while quit is False:
+        
+            for i in range(0, len(options)):
+                if i == selected:
+                    attr = curses.A_REVERSE | color
+                else:
+                    attr = color
+                mainWindow.addstr(i + 1, w // 2 - len(options[i]) // 2, options[i], attr)
+
+            mainWindow.refresh()
+
+            key = get_key_or_button(mainWindow)           
+            match key:
+                case "up":
+                    if selected > 0:
+                        selected = selected - 1
+                case "down":
+                    if selected < len(options) - 1:
+                        selected = selected + 1
+                case "enter":
+                    match selected:
+                        case 0:
+                            rebuild_installed_xml_file()
+                        case 1:
+                            reset_game_mapping()
+                        case 2:
+                            reset_all_mappings()
+                        case 3:
+                            uninstall_game()
+                        case 4:
+                            if uninstall_exodos() is True:
+                                quit = True
+                        case _:
+                            quit = True
+                    stdscr.refresh()
+        
+    except Exception as err:
+        stdscr.addstr(0,0,str(err))
+            
+
+def main(argv):
+
+    global stdscr
+
+    # Curses initialization
+    stdscr = curses.initscr()
+    curses.noecho()
+    curses.cbreak()
+    curses.curs_set(False)
+    if curses.has_colors():
+        curses.start_color()
+        
+    e = None
+    try:
+        stdscr.addstr(curses.LINES - 1, curses.COLS - len(version_str) - 1, version_str)        
+        show_title(res_dir)
+        main_menu()
+
+    except Exception as err:
+        e = err
+
+    curses.nocbreak()
+    curses.echo()
+    curses.curs_set(True)
+    curses.endwin()
+    pygame.quit()
+    if e is not None:
+        print(e)
+
+
+FLATPAK_ID = 'com.yappari.DOSVault'
+config = {}
+
+# Get the global configuration
+if 'FLATPAK_ID' in os.environ and os.environ['FLATPAK_ID'] == FLATPAK_ID:
+    base_dir = "/app"
+else:
+    base_dir = os.environ['PWD']
+
+# Read the configuration files
+res_dir = base_dir + "/resources"
+lib_dir = base_dir + "/libexec"
+config_dir = f"{os.environ['HOME']}/.var/app/{FLATPAK_ID}/config/DOSVault"
+config_file = f"{config_dir}/DOSVault.conf"
+version_file = f"{lib_dir}/version.sh"
+
+try:
+    read_config_file(version_file)
+    read_config_file(config_file)
+    if 'install_dir' not in config:
+        raise FileNotFoundError("no config")
+except FileNotFoundError as err:
+    pygame.quit()
+    print("DOSVault is not installed")
+    exit(1)
+    
+dosvault_dir = f"{config['install_dir']}/DOSVault"
+exodos_dir = f"{dosvault_dir}/eXoDOS/eXo/eXoDOS"
+exo_dir = f"{dosvault_dir}/eXoDOS/eXo"
+xml_file = f"{dosvault_dir}/eXoDOS/DOS.metadata.pegasus.txt"
+installed_xml_file = f"{dosvault_dir}/eXoDOS/Installed.metadata.pegasus.txt"
+
+if 'dosvault_version' not in config:
+    config['dosvault_version'] = "Unknown"
+version_str = f"DOSVault Configuration Tool v{config['dosvault_version']}"
+    
+pygame.display.init()
+pygame.joystick.init()
+
+# Get the first gamepad if available
+if pygame.joystick.get_count() > 0:
+    gamepad = pygame.joystick.Joystick(0)
+else:
+    gamepad = None
+    
+stdscr = None
+
+if __name__ == "__main__":
+  main(sys.argv[1:])

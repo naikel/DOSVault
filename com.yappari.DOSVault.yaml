@@ -161,6 +161,9 @@ modules:
 
   # VDF Parser for Python
   - python3-vdf.json
+
+  # Pygame
+  - python3-pygame.json
     
   # DOSVault
   - name: DOSVault
@@ -182,7 +185,7 @@ modules:
       - install -Dm755 launch.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 install.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 install_game.sh ${FLATPAK_DEST}/libexec
-      - install -Dm755 admin.sh ${FLATPAK_DEST}/libexec
+      - install -Dm755 adminTool ${FLATPAK_DEST}/libexec
       - install -Dm755 version.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 xml2pegasus ${FLATPAK_DEST}/libexec
       - install -Dm755 getsteamappid ${FLATPAK_DEST}/libexec

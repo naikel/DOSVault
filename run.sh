@@ -23,7 +23,7 @@ source ${lib_dir}/global.sh
 # Check if DOSVault is installed properly
 if [ ! -f $xml_file ]; then
     # Install DOSVault
-    LC_ALL=en_US.UTF-8 uxterm $xterm_mode -geom 85x26 -fg gray -bg black -fa 'DejaVu Sans Mono' -fs 19 -e /bin/bash $lib_dir/install.sh
+    LC_ALL=en_US.UTF-8 uxterm $xterm_mode -e /bin/bash $lib_dir/install.sh
     
     # Reload settings
     source ${lib_dir}/global.sh

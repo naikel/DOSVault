@@ -17,11 +17,10 @@ if [ $? -eq 1 ]; then
 else
     VERSION="${LAST_TAG}"
 fi
-printf "#!/bin/bash\ndosvault_version=%s\n" "${VERSION}" > libexec/version.sh
+printf "dosvault_version=%s\n" "${VERSION}" > libexec/version.sh
 chmod +x libexec/version.sh
 
 echo Building DOSVAULT version ${VERSION}
-mkdir -p ${BUILD_DIR}
 mkdir -p ${BUILD_DIR}/repo
 cd ${BUILD_DIR}
 flatpak-builder --repo=repo --force-clean --install-deps-from=flathub app ${REPO_DIR}/com.yappari.DOSVault.yaml

@@ -74,6 +74,8 @@ for game in root.findall("Game"):
     developer = game.find("Developer").text
     publisher = game.find("Publisher").text
     genre = game.find("Genre").text
+    if genre is not None:
+        genre = genre.replace(";",",").replace(" / ", ",")
     notes = game.find("Notes").text
     if notes is not None:
         description = game.find("Notes").text.replace("\n\n", "\n").replace("\n", "\n  .\n  ")
@@ -86,7 +88,9 @@ for game in root.findall("Game"):
     print(f"sort_title: {title}")
     print(f"file: {file}")
     print(f"developer: {developer}")
+    print(f"publisher: {publisher}")    
     print(f"release: {year}")
+    print(f"genres: {genre}")
     print(f"description: {description}")
     print(f"rating: {rating}")
     print(f"x-scrape-source: xml2pegasus")

@@ -1,0 +1,14 @@
+{
+    "name": "python3-pygame",
+    "buildsystem": "simple",
+    "build-commands": [
+        "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"pygame\" --no-build-isolation"
+    ],
+    "sources": [
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/72/49/bd2fcbadb6a55bb24284bad4f530189401c99ffc234d51ba54756a776eb2/pygame-2.6.0.tar.gz",
+            "sha256": "722d33ae676aa8533c1f955eded966411298831346b8d51a77dad22e46ba3e35"
+        }
+    ]
+}

@@ -173,8 +173,8 @@ convert_xml_to_pegasus() {
         printf "Converting ${Cyan}LaunchBox XML file${Color_Off} to ${Green}Pegasus Metadata format${Color_Off}... "
         $lib_dir/xml2pegasus "${dosvault_dir}/eXoDOS/xml/all/MS-DOS.xml" "${dosvault_dir}" "${lib_dir}/launch.sh" >$xml_file
         head -2 $xml_file | sed s/DOS/Installed/ >${installed_xml_file}
-        printf "file: ${lib_dir}/admin.sh\n" >>${installed_xml_file}
-        sed "s@admin.sh@${lib_dir}/admin.sh@" ${res_dir}/admin.txt | sed "s/@VERSION@/${dosvault_version}/" >>${xml_file}
+        printf "file: ${lib_dir}/adminTool\n" >>${installed_xml_file}
+        sed "s@admin.sh@${lib_dir}/adminTool@" ${res_dir}/admin.txt | sed "s/@VERSION@/${dosvault_version}/" >>${xml_file}
         printf "asset.box_front: /app/grid/${FLATPAK_ID}_p.png\n" >>${xml_file}
         printf "\n${Green}Pegasus Metadata file created successfully!${Color_Off}\n"
         pegasus_dir="$HOME/.var/app/${FLATPAK_ID}/config/pegasus-frontend"
