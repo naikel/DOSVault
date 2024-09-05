@@ -1,0 +1,791 @@
+diff --git a/.gitmodules b/.gitmodules
+index d08e9697..759336ec 100644
+--- a/.gitmodules
++++ b/.gitmodules
+@@ -8,3 +8,6 @@
+ [submodule "thirdparty/SortFilterProxyModel"]
+ 	path = thirdparty/SortFilterProxyModel
+ 	url = https://github.com/mmatyas/SortFilterProxyModel.git
++[submodule "thirdparty/UnixSignalsInQt"]
++	path = thirdparty/UnixSignalsInQt
++	url = https://github.com/Childcity/UnixSignalsInQt.git
+diff --git a/src/app/main.cpp b/src/app/main.cpp
+index 70e202ec..b5d10fcc 100644
+--- a/src/app/main.cpp
++++ b/src/app/main.cpp
+@@ -74,6 +74,10 @@ int main(int argc, char *argv[])
+ 
+     backend::Backend backend(cli_args);
+     backend.start();
++    
++#if defined(Q_OS_LINUX)
++    backend.connectSystemSignals(app);
++#endif    
+ 
+     return app.exec();
+ }
+diff --git a/src/backend/Backend.cpp b/src/backend/Backend.cpp
+index c5dfdd81..afbea809 100644
+--- a/src/backend/Backend.cpp
++++ b/src/backend/Backend.cpp
+@@ -37,6 +37,11 @@
+ #include "SortFilterProxyModel/proxyroles/proxyrolesqmltypes.h"
+ #include "SortFilterProxyModel/sorters/sortersqmltypes.h"
+ 
++#if defined(Q_OS_LINUX)
++// For UNIX Signals catching
++#include "UnixSignalsInQt/src/csystemsignalslistener.h"
++#endif
++
+ #include <QGuiApplication>
+ #include <QQmlEngine>
+ 
+@@ -269,4 +274,37 @@ void Backend::onProcessFinished()
+     m_api_private->gamepad().start(m_args);
+ }
+ 
++#if defined(Q_OS_LINUX)
++
++void Backend::connectSystemSignals(const QCoreApplication &a)
++{	
++	using namespace childcity;
++	using SysSig = CSystemSignalsListener::SysSig;
++
++	// This will instantiate Singleton object in static memory
++    CSystemSignalsListener::GetInstance();
++
++	// Connect system signals to method, which will be emited after system signal raised
++	QObject::connect(&CSystemSignalsListener::GetInstance(), &CSystemSignalsListener::sigSystemSignal, &a, [&a, this](SysSig sig){
++		switch (sig) {
++			case SysSig::SigHup:
++				onScanRequested();
++				return;
++			case SysSig::SigTerm:
++				[[fallthrough]];
++			case SysSig::SigInt:
++				a.quit();
++				break;
++			case SysSig::SigSegv:
++				// Obviously, without next 3 lines in the code, there would not be core file.
++				const auto pid = static_cast<pid_t>(QCoreApplication::applicationPid());
++				signal(SIGSEGV, nullptr); // nullptr == SIG_DFL
++				kill(pid, SIGSEGV);
++				break;
++		}
++	}, Qt::ConnectionType::DirectConnection); // Should be always Qt::ConnectionType::DirectConnection !!!
++}
++
++#endif
++
+ } // namespace backend
+diff --git a/src/backend/Backend.h b/src/backend/Backend.h
+index fe5886eb..b194f8ed 100644
+--- a/src/backend/Backend.h
++++ b/src/backend/Backend.h
+@@ -17,6 +17,8 @@
+ 
+ #pragma once
+ 
++#include <QCoreApplication>
++
+ #include "CliArgs.h"
+ 
+ namespace model { class ApiObject; }
+@@ -38,6 +40,10 @@ public:
+     Backend& operator=(const Backend&) = delete;
+ 
+     void start();
++    
++#if defined(Q_OS_LINUX)
++    void connectSystemSignals(const QCoreApplication &a);
++#endif    
+ 
+ private:
+     const CliArgs m_args;
+diff --git a/src/backend/ProcessLauncher.cpp b/src/backend/ProcessLauncher.cpp
+index 9bd09a6f..f90ac09f 100644
+--- a/src/backend/ProcessLauncher.cpp
++++ b/src/backend/ProcessLauncher.cpp
+@@ -29,8 +29,10 @@
+ #include "platform/AndroidHelpers.h"
+ #endif
+ 
++#include <QtGlobal>
+ #include <QDir>
+ #include <QUrl>
++#include <QFileInfo>
+ #include <QRegularExpression>
+ 
+ 
+@@ -148,6 +150,30 @@ QString abs_workdir(const QString& workdir, const QString& base_dir, const QStri
+ 
+     return ::clean_abs_path(QFileInfo(base_dir, workdir));
+ }
++
++bool is_launch_cmd_local(const QString& launch_cmd)
++{
++    // If launch_cmd is an absolute path, let's check if the file exists or not
++    if (contains_slash(launch_cmd)) {
++        QFileInfo fileInfo(launch_cmd);
++        return fileInfo.exists();
++    }
++
++    // Check if the launch_cmd is in path
++#ifdef Q_OS_WINDOWS
++    QChar path_separator = ';'
++#else
++    QChar path_separator = ':';
++#endif
++
++    QStringList paths = qEnvironmentVariable("PATH").split(path_separator);
++    foreach (const QString& path, paths) {
++        QFileInfo fileInfo(path + QDir::separator() + launch_cmd);
++        if (fileInfo.exists())
++            return true;
++    }
++    return false;
++}
+ } // namespace helpers
+ 
+ 
+@@ -163,11 +189,12 @@ void ProcessLauncher::onLaunchRequested(const model::GameFile* q_gamefile)
+     const model::GameFile& gamefile = *q_gamefile;
+     const model::Game& game = *gamefile.parentGame();
+ 
+-    const QString raw_launch_cmd =
+ #if defined(Q_OS_LINUX) && defined(PEGASUS_INSIDE_FLATPAK)
+-        QLatin1String("flatpak-spawn --host ") + game.launchCmd();
++    const QString raw_launch_cmd = (helpers::is_launch_cmd_local(game.launchCmd().split(' ')[0]))
++                                       ? game.launchCmd()
++                                       : QLatin1String("flatpak-spawn --host ") + game.launchCmd();
+ #else
+-        game.launchCmd();
++    const QString raw_launch_cmd = game.launchCmd();
+ #endif
+ 
+ 
+diff --git a/src/backend/backend.pro b/src/backend/backend.pro
+index fd5fbf22..8a907375 100644
+--- a/src/backend/backend.pro
++++ b/src/backend/backend.pro
+@@ -1,7 +1,7 @@
+ TEMPLATE = lib
+ 
+ QT += qml quick sql
+-CONFIG += c++11 staticlib warn_on exceptions_off
++CONFIG += c++14 staticlib warn_on exceptions_off
+ android: QT += androidextras
+ 
+ !isEmpty(USE_SDL_GAMEPAD)|!isEmpty(USE_SDL_POWER): include($${TOP_SRCDIR}/thirdparty/link_to_sdl.pri)
+Submodule thirdparty/UnixSignalsInQt contains modified content
+Submodule thirdparty/UnixSignalsInQt 00000000...5f67acf3 (new submodule)
+diff --git a/thirdparty/UnixSignalsInQt/.gitignore b/thirdparty/UnixSignalsInQt/.gitignore
+new file mode 100644
+index 0000000..a07f753
+--- /dev/null
++++ b/thirdparty/UnixSignalsInQt/.gitignore
+@@ -0,0 +1,54 @@
++# C++ objects and libs
++*.slo
++*.lo
++*.o
++*.a
++*.la
++*.lai
++*.so
++*.so.*
++*.dll
++*.dylib
++
++build*
++
++# Qt-es
++object_script.*.Release
++object_script.*.Debug
++*_plugin_import.cpp
++/.qmake.cache
++/.qmake.stash
++*.pro.user
++*.pro.user.*
++*.qbs.user
++*.qbs.user.*
++*.moc
++moc_*.cpp
++moc_*.h
++qrc_*.cpp
++ui_*.h
++*.qmlc
++*.jsc
++Makefile*
++*build-*
++*.qm
++*.prl
++
++# Qt unit tests
++target_wrapper.*
++
++# QtCreator
++*.autosave
++
++# QtCreator Qml
++*.qmlproject.user
++*.qmlproject.user.*
++
++# QtCreator CMake
++CMakeLists.txt.user*
++
++# QtCreator 4.8< compilation database 
++compile_commands.json
++
++# QtCreator local machine specific files for imported projects
++*creator.user*
+diff --git a/thirdparty/UnixSignalsInQt/LICENSE b/thirdparty/UnixSignalsInQt/LICENSE
+new file mode 100644
+index 0000000..16cbcf0
+--- /dev/null
++++ b/thirdparty/UnixSignalsInQt/LICENSE
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2020 Nikolas
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+diff --git a/thirdparty/UnixSignalsInQt/README.md b/thirdparty/UnixSignalsInQt/README.md
+new file mode 100644
+index 0000000..c6735be
+--- /dev/null
++++ b/thirdparty/UnixSignalsInQt/README.md
+@@ -0,0 +1,74 @@
++# UnixSignalsInQt
++Simple UNIX Signals catcher in Qt
++
++If you would like to write any program in Qt/C++, you must:
++- take care of the correct exit from [Qt Event Loop](https://wiki.qt.io/Threads_Events_QObjects);
++- correct release all allocated memory;
++
++If user press Ctrl+C in Terminal or send SIGTERM, you're program will be closed unexpectedly with error code.
++
++This realization based on offisial [Qt documentation](https://doc.qt.io/qt-5/unix-signals.html) for solving such kind of problem. 
++Try it and you will see, this is convenient!
++
++# Little Example of using it (full in ./example/main.cpp)
++- ## Header files for this example
++	```cpp
++		#include "../src/csystemsignalslistener.h"
++
++		#include <QCoreApplication>
++		#include <QTimer>
++		#include <QDebug>
++	```
++
++- ## Function, that do all stuff with System Signals
++	```cpp
++		void connectSystemSignals(const QCoreApplication &a)
++		{	
++			using namespace childcity;
++			using SysSig = CSystemSignalsListener::SysSig;
++
++			try {
++				// This will instantiate Singleton object in static memory
++				CSystemSignalsListener::GetInstance();
++			} catch (SetupSystemSignalException e) {
++				// Do nothing. You can exit(ERROR_CODE) or do other things
++			}
++
++			// Connect system signals to method, which will be emited after system signal raised
++			QObject::connect(&CSystemSignalsListener::GetInstance(), &CSystemSignalsListener::sigSystemSignal, &a, [&a](SysSig sig){
++				qInfo() << "Cought system signal: " << sig;
++				switch (sig) {
++					case SysSig::SigHup:
++						// Do nothing on HUB.
++						return;
++					case SysSig::SigTerm:
++						[[fallthrough]];
++					case SysSig::SigInt:
++						a.quit();
++						break;
++					case SysSig::SigSegv:
++						// Obviously, without next 3 lines in the code, there would not be core file.
++						const auto pid = static_cast<pid_t>(QCoreApplication::applicationPid());
++						signal(SIGSEGV, nullptr); // nullptr == SIG_DFL
++						kill(pid, SIGSEGV);
++						break;
++				}
++			}, Qt::ConnectionType::DirectConnection); // Should be always Qt::ConnectionType::DirectConnection !!!
++		}
++	```
++
++- ## Main function
++	```cpp
++		int main(int argc, char *argv[])
++		{
++			QCoreApplication a(argc, argv);
++			
++			connectSystemSignals(a); 
++
++			// YOURE PRETTY COOL CODE IS ----> HERE <----- :)
++
++			return a.exec();
++		}
++	```
++
++### That's all you need ;)
+diff --git a/thirdparty/UnixSignalsInQt/example/UnixSignalsInQt.pro b/thirdparty/UnixSignalsInQt/example/UnixSignalsInQt.pro
+new file mode 100644
+index 0000000..0cb1f84
+--- /dev/null
++++ b/thirdparty/UnixSignalsInQt/example/UnixSignalsInQt.pro
+@@ -0,0 +1,15 @@
++QT -= gui
++
++CONFIG += c++17
++CONFIG -= app_bundle
++
++DEFINES += QT_DEPRECATED_WARNINGS
++DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
++
++SOURCES += \
++        main.cpp \
++    ../src/csystemsignalslistener.cpp
++
++HEADERS += \
++    ../src/utils.hpp \
++    ../src/csystemsignalslistener.h
+diff --git a/thirdparty/UnixSignalsInQt/example/main.cpp b/thirdparty/UnixSignalsInQt/example/main.cpp
+new file mode 100644
+index 0000000..9aaf0c3
+--- /dev/null
++++ b/thirdparty/UnixSignalsInQt/example/main.cpp
+@@ -0,0 +1,60 @@
++#include "../src/csystemsignalslistener.h"
++
++#include <QCoreApplication>
++#include <QTimer>
++#include <QDebug>
++
++// Will quit this thread Qt EventLoop and safely call all destrucors
++// after catching SIGINT, SIGTERM, SIGSEGV from system
++void connectSystemSignals(const QCoreApplication &a)
++{
++    using namespace childcity;
++    using SysSig = CSystemSignalsListener::SysSig;
++
++    try {
++        CSystemSignalsListener::GetInstance();
++    } catch (SetupSystemSignalException e) {
++        // Do nothing. My app should continue working.
++    }
++
++    QObject::connect(&CSystemSignalsListener::GetInstance(), &CSystemSignalsListener::sigSystemSignal, &a, [&a](SysSig sig){
++        qInfo() << "Cought system signal: " << sig;
++        switch (sig) {
++            case SysSig::SigHup:
++                // Do nothing on HUB.
++                return;
++            case SysSig::SigTerm:
++                [[fallthrough]];
++            case SysSig::SigInt:
++                a.quit();
++                break;
++            case SysSig::SigSegv:
++                // Obviously, without next 3 lines in the code, there would not be core file.
++                const auto pid = static_cast<pid_t>(QCoreApplication::applicationPid());
++                signal(SIGSEGV, nullptr); // nullptr == SIG_DFL
++                kill(pid, SIGSEGV);
++                break;
++        }
++    }, Qt::ConnectionType::DirectConnection); // Should be always Qt::ConnectionType::DirectConnection !!!
++}
++
++int main(int argc, char *argv[])
++{
++    QCoreApplication a(argc, argv);
++
++    connectSystemSignals(a);
++
++    // Rise SIGTERM for test purpose
++    QTimer::singleShot(0, &a, [&]{ raise(SIGTERM); });
++
++    return a.exec();
++}
++
++// Result after run of this program
++/*
++ *
++ * Running... ~/TestSystemSignals/build_Shared-Profile/TestSystemSignals...
++ * Cought system signal:  childcity::CSystemSignalsListener::SysSig(SigTerm)
++ * ~/TestSystemSignals/build_Shared-Profile/TestSystemSignals exit with code 0
++ *
++ */
+diff --git a/thirdparty/UnixSignalsInQt/src/UnixSignalsInQt.pri b/thirdparty/UnixSignalsInQt/src/UnixSignalsInQt.pri
+new file mode 100644
+index 0000000..16a15cc
+--- /dev/null
++++ b/thirdparty/UnixSignalsInQt/src/UnixSignalsInQt.pri
+@@ -0,0 +1,10 @@
++!contains( CONFIG, c\+\+14 ): warning("UnixSignalsInQt needs at least c++14, add CONFIG += c++14 to your .pro")
++
++CONFIG += exceptions
++
++INCLUDEPATH += $$PWD
++
++HEADERS += $$PWD/csystemsignalslistener.h \
++    $$PWD/utils.hpp
++
++SOURCES += $$PWD/csystemsignalslistener.cpp
+diff --git a/thirdparty/UnixSignalsInQt/src/csystemsignalslistener.cpp b/thirdparty/UnixSignalsInQt/src/csystemsignalslistener.cpp
+new file mode 100644
+index 0000000..796b9f5
+--- /dev/null
++++ b/thirdparty/UnixSignalsInQt/src/csystemsignalslistener.cpp
+@@ -0,0 +1,172 @@
++#include "csystemsignalslistener.h"
++
++#include <unistd.h>
++#include <sys/socket.h>
++
++namespace childcity {
++
++
++SetupSystemSignalException::~SetupSystemSignalException()
++{}
++
++
++int CSystemSignalsListener::sigHupFd[] = {0};
++int CSystemSignalsListener::sigTermFd[] = {0};
++int CSystemSignalsListener::sigIntFd[] = {0};
++int CSystemSignalsListener::sigSegvFd[] = {0};
++
++int CSystemSignalsListener::SetupUnixSignalHandlers()
++{
++    struct sigaction hup, term, intr, segv;
++
++    {
++        hup.sa_handler = CSystemSignalsListener::HupSignalHandler;
++        sigemptyset(&hup.sa_mask);
++        hup.sa_flags = 0;
++        hup.sa_flags |= SA_RESTART;
++
++        if (sigaction(SIGHUP, &hup, nullptr))
++            return 1;
++    }
++
++    {
++        term.sa_handler = CSystemSignalsListener::TermSignalHandler;
++        sigemptyset(&term.sa_mask);
++        term.sa_flags |= SA_RESTART;
++
++        if (sigaction(SIGTERM, &term, nullptr))
++            return 2;
++    }
++
++    {
++        intr.sa_handler = CSystemSignalsListener::IntSignalHandler;
++        sigemptyset(&intr.sa_mask);
++        intr.sa_flags |= SA_RESTART;
++
++        if (sigaction(SIGINT, &intr, nullptr))
++            return 3;
++    }
++
++    {
++        segv.sa_handler = CSystemSignalsListener::SegvSignalHandler;
++        sigemptyset(&segv.sa_mask);
++        segv.sa_flags |= SA_RESTART;
++
++        if (sigaction(SIGSEGV, &segv, nullptr))
++            return 4;
++    }
++
++    return 0;
++}
++
++void CSystemSignalsListener::HupSignalHandler(int)
++{
++    char a = 1;
++    UNUSED_RET(::write(sigHupFd[0], &a, sizeof(a)));
++}
++
++void CSystemSignalsListener::TermSignalHandler(int)
++{
++    char a = 1;
++    UNUSED_RET(::write(sigTermFd[0], &a, sizeof(a)));
++}
++
++void CSystemSignalsListener::IntSignalHandler(int)
++{
++    char a = 1;
++    UNUSED_RET(::write(sigIntFd[0], &a, sizeof(a)));
++}
++
++void CSystemSignalsListener::SegvSignalHandler(int)
++{
++    char a = 1;
++    UNUSED_RET(::write(sigSegvFd[0], &a, sizeof(a)));
++}
++
++CSystemSignalsListener &CSystemSignalsListener::GetInstance()
++{
++    static CSystemSignalsListener INSTANCE;
++    return INSTANCE;
++}
++
++CSystemSignalsListener::CSystemSignalsListener()
++{
++    if(int ret = SetupUnixSignalHandlers()){
++        throw SetupSystemSignalException(QString("SetupUnixSignalHandlers returned with: %1").arg(ret));
++    }
++
++    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, sigHupFd))
++        throw SetupSystemSignalException("Couldn't create HUP socketpair");
++
++    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, sigTermFd))
++        throw SetupSystemSignalException("Couldn't create TERM socketpair");
++
++    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, sigIntFd))
++        throw SetupSystemSignalException("Couldn't create INT socketpair");
++
++    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, sigSegvFd))
++        throw SetupSystemSignalException("Couldn't create SEGV socketpair");
++
++    snHup_ = qt_make_unique<QSocketNotifier>(sigHupFd[1], QSocketNotifier::Read);
++    connect(&*snHup_, &QSocketNotifier::activated, this, &CSystemSignalsListener::handleSigHup);
++
++    snTerm_ = qt_make_unique<QSocketNotifier>(sigTermFd[1], QSocketNotifier::Read);
++    connect(&*snTerm_, &QSocketNotifier::activated, this, &CSystemSignalsListener::handleSigTerm);
++
++    snInt_ = qt_make_unique<QSocketNotifier>(sigIntFd[1], QSocketNotifier::Read);
++    connect(&*snInt_, &QSocketNotifier::activated, this, &CSystemSignalsListener::handleSigInt);
++
++    snSegv_ = qt_make_unique<QSocketNotifier>(sigSegvFd[1], QSocketNotifier::Read);
++    connect(&*snSegv_, &QSocketNotifier::activated, this, &CSystemSignalsListener::handleSigSegv);
++}
++
++void CSystemSignalsListener::handleSigHup()
++{
++    snHup_->setEnabled(false);
++
++    char tmp;
++    UNUSED_RET(::read(sigHupFd[1], &tmp, sizeof(tmp)));
++
++    emit sigSystemSignal(SysSig::SigHup);
++
++    snHup_->setEnabled(true);
++}
++
++void CSystemSignalsListener::handleSigTerm()
++{
++    snTerm_->setEnabled(false);
++
++    char tmp;
++    UNUSED_RET(::read(sigTermFd[1], &tmp, sizeof(tmp)));
++
++    emit sigSystemSignal(SysSig::SigTerm);
++
++    snTerm_->setEnabled(true);
++}
++
++void CSystemSignalsListener::handleSigInt()
++{
++    snInt_->setEnabled(false);
++
++    char tmp;
++    UNUSED_RET(::read(sigIntFd[1], &tmp, sizeof(tmp)));
++
++    emit sigSystemSignal(SysSig::SigInt);
++
++    snInt_->setEnabled(true);
++}
++
++void CSystemSignalsListener::handleSigSegv()
++{
++    snSegv_->setEnabled(false);
++
++    char tmp;
++    UNUSED_RET(::read(sigSegvFd[1], &tmp, sizeof(tmp)));
++
++    emit sigSystemSignal(SysSig::SigSegv);
++
++    snSegv_->setEnabled(true);
++}
++
++
++}
+diff --git a/thirdparty/UnixSignalsInQt/src/csystemsignalslistener.h b/thirdparty/UnixSignalsInQt/src/csystemsignalslistener.h
+new file mode 100644
+index 0000000..64020b8
+--- /dev/null
++++ b/thirdparty/UnixSignalsInQt/src/csystemsignalslistener.h
+@@ -0,0 +1,110 @@
++/*
++ * System Signal Listener
++ * version 1.0.0
++ * https://github.com/Childcity/UnixSignalsInQt
++ *
++ * Licensed under the MIT License <http://opensource.org/licenses/MIT>.
++ * Copyright (c) 2020 Childcity
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ * The above copyright notice and this permission notice shall be included in all
++ * copies or substantial portions of the Software.
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#ifndef CSYSTEMSIGNALSLISTENER_H
++#define CSYSTEMSIGNALSLISTENER_H
++
++#include "utils.hpp"
++
++#include <QSocketNotifier>
++#include <exception>
++#include <signal.h>
++
++namespace childcity {
++
++
++struct SetupSystemSignalException: public std::runtime_error {
++public:
++    using std::runtime_error::runtime_error;
++
++    SetupSystemSignalException(const QString str)
++        : std::runtime_error(std::move(str.toStdString()))
++    {}
++
++    SetupSystemSignalException(const SetupSystemSignalException &) = default;
++
++    ~SetupSystemSignalException() override;
++};
++
++
++class CSystemSignalsListener: public QObject {
++    Q_OBJECT
++
++private:
++    static int sigHupFd[2];
++    static int sigTermFd[2];
++    static int sigIntFd[2];
++    static int sigSegvFd[2];
++
++    qt_unique_ptr<QSocketNotifier> snHup_;
++    qt_unique_ptr<QSocketNotifier> snTerm_;
++    qt_unique_ptr<QSocketNotifier> snInt_;
++    qt_unique_ptr<QSocketNotifier> snSegv_;
++
++private:
++
++    static int SetupUnixSignalHandlers();
++
++    // Unix signal handlers.
++    static void HupSignalHandler(int);
++    static void TermSignalHandler(int);
++    static void IntSignalHandler(int);
++    static void SegvSignalHandler(int);
++
++public:
++
++    enum class SysSig {
++        SigHup = SIGHUP,
++        SigTerm = SIGTERM,
++        SigInt = SIGINT,
++        SigSegv = SIGSEGV
++    };
++    Q_ENUM(SysSig)
++
++    static CSystemSignalsListener& GetInstance();
++
++    CSystemSignalsListener(const CSystemSignalsListener&) = delete;
++    CSystemSignalsListener(CSystemSignalsListener&&) = delete;
++    CSystemSignalsListener& operator=(const CSystemSignalsListener&) = delete;
++    CSystemSignalsListener& operator=(CSystemSignalsListener&&) = delete;
++
++signals:
++    void sigSystemSignal(SysSig sig);
++
++private:
++    explicit CSystemSignalsListener();
++
++private slots:
++
++    // Qt signal handlers.
++    void handleSigHup();
++    void handleSigTerm();
++    void handleSigInt();
++    void handleSigSegv();
++};
++
++
++}
++
++#endif // CSYSTEMSIGNALSLISTENER_H
+diff --git a/thirdparty/UnixSignalsInQt/src/utils.hpp b/thirdparty/UnixSignalsInQt/src/utils.hpp
+new file mode 100644
+index 0000000..4cd1fbd
+--- /dev/null
++++ b/thirdparty/UnixSignalsInQt/src/utils.hpp
+@@ -0,0 +1,31 @@
++#ifndef UTILS_HPP
++#define UTILS_HPP
++
++#include <QObject>
++#include <memory>
++
++namespace childcity {
++
++template <class T>
++void UNUSED_RET(T funk){
++    const auto unused = (funk);
++    (void) unused;
++}
++
++struct QObjectDeleteLater {
++    void operator()(QObject *o) {
++        o->deleteLater();
++    }
++};
++
++template<typename T>
++using qt_unique_ptr = std::unique_ptr<T, QObjectDeleteLater>;
++
++template<class T, class... _Types, std::enable_if_t<! std::is_array<T>::value, int> = 0>
++inline qt_unique_ptr<T> qt_make_unique(_Types&&... _Args){
++    return (qt_unique_ptr<T>(new T(std::forward<_Types>(_Args)...)));
++}
++
++}
++
++#endif // UTILS_HPP
+diff --git a/thirdparty/thirdparty.pri b/thirdparty/thirdparty.pri
+index 68973f7b..68747278 100644
+--- a/thirdparty/thirdparty.pri
++++ b/thirdparty/thirdparty.pri
+@@ -1,3 +1,4 @@
+ INCLUDEPATH += $$PWD
+ 
+ include(SortFilterProxyModel/SortFilterProxyModel.pri)
++include(UnixSignalsInQt/src/UnixSignalsInQt.pri)

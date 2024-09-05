@@ -60,6 +60,10 @@ if [ "$k" = "key:y" -o "$k" = "button:a" ]; then
     if [ -f "${exodos_dir}/${base_name}" ]; then
         unzip -o "${exodos_dir}/${base_name}" -d "${exodos_dir}"
         echo "file: $2" >> ${installed_xml_file}
+        
+        # Request rescan to Pegasus
+        kill -SIGHUP $(pidof pegasus-fe)
+ 
     fi
 else
     printf "\nCancelling..."

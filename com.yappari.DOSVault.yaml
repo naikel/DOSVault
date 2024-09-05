@@ -116,7 +116,7 @@ modules:
         url: https://github.com/joncampbell123/dosbox-x
         tag: "dosbox-x-v2024.07.01"
       - type: patch
-        path: dosbox-x.patch
+        path: patches/dosbox-x.patch
     x-checker-data:
       type: anitya
       project-id: 242383
@@ -148,7 +148,7 @@ modules:
         commit: cc2497abf7ebb12e0cbdb57a16addaf62d6f50bd
         branch: master
       - type: patch
-        path: pegasus-frontend.patch
+        path: patches/pegasus-frontend.patch
 
   # getpadbuttonSDL2
   - name: getpadbuttonSDL2
@@ -160,10 +160,13 @@ modules:
         path: src/getpadbuttonSDL2.c
 
   # VDF Parser for Python
-  - python3-vdf.json
+  - pip-modules/python3-vdf.json
 
   # Pygame
-  - python3-pygame.json
+  - pip-modules/python3-pygame.json
+
+  # Psutil
+  - pip-modules/python3-psutil.json
     
   # DOSVault
   - name: DOSVault
@@ -172,6 +175,7 @@ modules:
       - install -Dm644 ${FLATPAK_ID}.desktop ${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop
       - install -Dm644 ${FLATPAK_ID}.png ${FLATPAK_DEST}/share/icons/hicolor/128x128/apps
       - install -Dm755 run.sh ${FLATPAK_DEST}/bin
+      - install -Dm755 steam ${FLATPAK_DEST}/bin
       - mkdir -p ${FLATPAK_DEST}/resources ${FLATPAK_DEST}/libexec ${FLATPAK_DEST}/grid
       - install -Dm644 title.txt ${FLATPAK_DEST}/resources
       - install -Dm644 source.txt ${FLATPAK_DEST}/resources

@@ -2,6 +2,9 @@
 
 import shutil
 import curses
+import psutil
+import signal
+import time
 import math
 import sys
 import os
@@ -274,6 +277,13 @@ def select_game():
             
     except Exception as err:
         stdscr.addstr(0,0,str(err)+str(i))
+        
+        
+def get_pid_by_name(process_name):
+    for proc in psutil.process_iter(attrs=['pid', 'name']):
+        if process_name.lower() in proc.info['name'].lower():
+            return proc.info['pid']
+    return None
 
 
 def rebuild_installed_xml_file(silent=False):
@@ -292,6 +302,12 @@ def rebuild_installed_xml_file(silent=False):
         
         for game in games:
             f.write(f"file: {exodos_dir}/!dos/{game['dir']}/dosbox.conf\n")
+            
+    # Request a re-scan to Pegasus
+    process_name = 'pegasus-fe'
+    pid = get_pid_by_name(process_name)
+    if pid:
+        os.kill(pid, signal.SIGHUP)
             
     if silent is False:            
         message_box("The database has been rebuilt", False)
@@ -331,24 +347,53 @@ def uninstall_game():
 def uninstall_exodos():
     global config_file
     global dosvault_dir
+    global stdscr
 
     if message_box(f"Are you sure you want to uninstall\nall your eXoDOS games?", True) is True:
         games = get_installed_games()
-        if len(games) > 0 and message_box(f"You have {len(games)} game(s) installed!\nAre you REALLY SURE you want to uninstall\nall your eXoDOS games?", True, True) is True:
-            # Remove the whole DOSVault directory
-            if os.path.exists(dosvault_dir):
-                shutil.rmtree(dosvault_dir)
-            
-            # Delete config file
-            if os.path.exists(config_file):
-                os.remove(config_file)
-            
-            # Kill Pegasus?
-            
-            # Exit configuration tool, no longer needed
-            message_box("eXoDOS has been uninstalled.\n \nSee you soon!")
-            return True
+        if len(games) > 0:
+            if message_box(f"You have {len(games)} game(s) installed!\nAre you REALLY SURE you want to uninstall\nall your eXoDOS games?", True) is False:
+                return False
+               
+        # Little message box   
+        w = 40
+        h = 5
+        topX = (curses.COLS // 2) - (w // 2)
+        topY = (curses.LINES // 2) - (h // 2)
+
+        # Draw message box dialog
+        msgWindow = curses.newwin(h, w, topY, topX)
+        msgPanel = panel.new_panel(msgWindow)
+        msgWindow.bkgd(' ', curses.color_pair(2) | curses.A_BOLD)
+        msgWindow.box()
+        msg_str = "This is going to take a while..."
+        msgWindow.addstr(2, w // 2 - len(msg_str) // 2, msg_str)
+        stdscr.refresh()
+        msgWindow.refresh()
+        
+        time.sleep(2)
+                
+        # Remove the whole DOSVault directory
+        if os.path.exists(dosvault_dir):
+            shutil.rmtree(dosvault_dir)
+        
+        # Delete config file
+        if os.path.exists(config_file):
+            os.remove(config_file)
+        
+        # Exit configuration tool, no longer needed
+        message_box("eXoDOS has been uninstalled.\n \nSee you soon!")
+        
+        # Kill Pegasus
+        process_name = 'pegasus-fe'
+        pid = get_pid_by_name(process_name)
+        if pid:
+            os.kill(pid, signal.SIGTERM)
+
+        return True
+
     return False                    
+
             
 def main_menu():
     global stdscr    

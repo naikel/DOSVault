@@ -1,0 +1,35 @@
+#!/usr/bin/python3
+
+# This is a Steam wrapper for Pegasus to make it stop relaunching the frontend
+# after launching a game
+#
+# More info: https://github.com/mmatyas/pegasus-frontend/issues/442
+
+import time
+import sys
+import os
+import re
+
+def tail_f(filename, game_id):
+    with open(filename, 'r') as file:
+        file.seek(0, 2)
+        flatpak_id = os.environ.get("FLATPAK_ID")
+        if flatpak_id is not None and len(flatpak_id) > 0:
+            command = "flatpak-spawn --host steam"
+        else:
+            command = "steam"
+        exit_code = os.system(f"{command} steam://rungameid/{game_id}")
+        while True:
+            lines = file.readlines()
+            for line in lines:
+                yield line.strip()  # Yield each line
+            time.sleep(1)  # Sleep for a second before checking again
+
+home_dir = os.path.expanduser("~")
+steam_url = sys.argv[1].strip()
+
+game_id = steam_url.split("/")[-1]
+
+for log_line in tail_f(f"{home_dir}/.local/share/Steam/logs/content_log.txt", game_id):
+    if re.match(f".*Remove {game_id} from running list$", log_line):
+        exit(0)
