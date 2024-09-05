@@ -1,0 +1,3 @@
+/bin
+.qmake.stash
+libexec/version.sh

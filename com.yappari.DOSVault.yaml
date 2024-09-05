@@ -113,10 +113,8 @@ modules:
       - --enable-sdl2
     sources:
       - type: git
-        url: https://github.com/joncampbell123/dosbox-x
-        tag: "dosbox-x-v2024.07.01"
-      - type: patch
-        path: patches/dosbox-x.patch
+        url: https://github.com/naikel/dosbox-x.git
+        branch: notification
     x-checker-data:
       type: anitya
       project-id: 242383
@@ -144,11 +142,8 @@ modules:
         /app/share/metainfo/org.pegasus_frontend.Pegasus.metainfo.xml
     sources:
       - type: git
-        url: https://github.com/mmatyas/pegasus-frontend.git
-        commit: cc2497abf7ebb12e0cbdb57a16addaf62d6f50bd
-        branch: master
-      - type: patch
-        path: patches/pegasus-frontend.patch
+        url: https://github.com/naikel/pegasus-frontend.git
+        branch: dosvault
 
   # getpadbuttonSDL2
   - name: getpadbuttonSDL2
