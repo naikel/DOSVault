@@ -1,8 +1,12 @@
 ﻿# DOSVault
 
-DOSVault is a port of *[eXoDOS](https://www.retro-exo.com/exodos.html)* that's optimized for the Steam Deck but it can also be run on any Linux distro. It uses [Pegasus](https://pegasus-frontend.org/) as a frontend.
+![Steam Deck running DOSVault](https://raw.githubusercontent.com/naikel/DOSVault/master/screenshots/SteamDeckCanvas.png)
+DOSVault is a port of *[eXoDOS](https://www.retro-exo.com/exodos.html)* that's optimized for the Steam Deck but it can also be run on any Linux distro. It uses [Pegasus](https://pegasus-frontend.org/) as a frontend and [DOSBox-X](https://dosbox-x.com/) as the emulator. It's basically a group of scripts that will allow you to have an eXoDOS-like installation in your Steam Deck/Linux box.
 
 DOSVault behaves like the eXoDOS Lite version, and the games are installed on-demand. To install DOSVault, you need at least 12 GB free. After DOSVault is installed and deletes the installation files it will go down to around 5 GB.
+
+## Screenshots
+You can some screenshots [here](screenshots/README.md).
 
 ## Quick Guide
 If you're installing DOSVault on a Steam Deck you have to switch to *desktop mode* first.
@@ -12,6 +16,8 @@ Download and install the .flatpak file:
     sudo flatpak install --reinstall com.yappari.DOSVault.flatpak
 
 Load Steam and click on the *Add a Game* link on the bottom, and select *Add a Non-Steam Game...* and look for DOSVault.
+
+To exit a game: press the **Right Analog Trigger**!
 
 That's it! Enjoy!
 ## Controls
@@ -56,9 +62,41 @@ The following are tips & tricks I personally suggest. You can start from there, 
    * **Touch Double Press**: Right Mouse Click
 * If your game uses a mouse and is being erratically press  **Left Analog Trigger** + **Y** to capture the mouse. 
 
+## Limitations
+Compared to eXoDOS that uses LaunchBox, this project only does a tiny amount of what eXoDOS is capable. eXoDOS is a huge catalog that not only includes the games, but the user manuals, art, magazines, etc. Also eXoDOS support several emulators, including SCUMMVM, and different versions of DOSBox.
 
-## Bugs & Limitations
-* If you connect the Steam Deck to an external monitor, the native mouse can only reach 1280x800. This is a bug in the game mode of the Steam Deck. This will cause problems in the DOSBox-X Configuration Tool window, where you won't be able to reach some buttons. Some workarounds are:
-   * Perform your configuration using the native Steam Deck screen, and then connect it to an external screen when you want to play a game.
-   * Map the "Toggle Fullscreen" action to a button and play the game in fullscreen. This will play the game at 1280x800 and you won't notice the difference. You can clearly notice the difference in the DOS prompt. 
+DOSVault will launch every game using DOSBox-X at this time (but all of them should work!).
+
+
+## Bugs
+* If you connect the Steam Deck to an external monitor, the native mouse can only reach 1280x800. This is a bug in the game mode of the Steam Deck. This will cause problems in the DOSBox-X Configuration Tool and the Button Mapper windows, where you won't be able to reach some buttons. Some workarounds are:
+   * Perform your configuration using the native Steam Deck screen, and then connect it to an external screen when you are ready to play a game.
+   * Map the "Toggle Fullscreen" action to a button and play the game in fullscreen. This will play the game at 1280x800 and hopefully you won't notice the difference. You can clearly notice the difference in the DOS prompt. 
 *  If your screen is flashing for whatever reason, press **Left Analog Trigger** + **Y** to re-capture the mouse, it usually fixes everything (it's a DOSBox-X bug).
+
+## Building
+If you want to build DOSVault yourself, you will need to install these packages:
+
+ - git
+ - flatpak
+ - flatpak-builder
+
+Clone this repository using _git clone_, and then just issue the command:
+
+    ./build.sh [build-dir]
+    
+The _build-dir_ parameter is optional and points to a directory for the build. If you don't include it, the build directory will be:
+
+    $HOME/DOSVault-build
+
+At the end of the build process you will have a *com.yappari.DOSVault.flatpak* file in the build directory.
+
+## Patches
+Both Pegasus and DOSBox-X have been patched to look/work better on a Steam Deck. Patches included are:
+* **Pegasus**
+   * Ability to run commands inside the same flatpak (this allows the emulator to be executed).
+* **DOSBox-X**
+   * Simple notifications were implemented (so the user knows when he changes slots and saves to/loads from them).
+   * Changed Button Mapper resolution from 640x480 to 1280x800 (because it was too tiny on the Deck).
+
+
