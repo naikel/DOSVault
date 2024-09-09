@@ -1,7 +1,7 @@
 ﻿# DOSVault
 
 ![Steam Deck running DOSVault](https://raw.githubusercontent.com/naikel/DOSVault/master/screenshots/SteamDeckCanvas.png)
-DOSVault is a port of *[eXoDOS](https://www.retro-exo.com/exodos.html)* that's optimized for the Steam Deck but it can also be run on any Linux distro. It uses [Pegasus](https://pegasus-frontend.org/) as a frontend and [DOSBox-X](https://dosbox-x.com/) as the emulator. It's basically a group of scripts that will allow you to have an eXoDOS-like installation in your Steam Deck/Linux box.
+DOSVault is an unofficial port of *[eXoDOS](https://www.retro-exo.com/exodos.html)* that's optimized for the Steam Deck but it can also be run on any Linux distro. It uses [Pegasus](https://pegasus-frontend.org/) as a frontend and [DOSBox-X](https://dosbox-x.com/) as the emulator. It's basically a group of scripts that will allow you to have an eXoDOS-like installation in your Steam Deck/Linux box.
 
 DOSVault behaves like the eXoDOS Lite version, and the games are installed on-demand. To install DOSVault, you need at least 12 GB free. After DOSVault is installed and deletes the installation files it will go down to around 5 GB.
 
@@ -13,6 +13,7 @@ If you're installing DOSVault on a Steam Deck you have to switch to *desktop mod
 
 Download and install the .flatpak file:
 
+    wget https://github.com/naikel/DOSVault/releases/download/latest/com.yappari.DOSVault.flatpak
     sudo flatpak install --reinstall com.yappari.DOSVault.flatpak
 
 Load Steam and click on the *Add a Game* link on the bottom, and select *Add a Non-Steam Game...* and look for DOSVault.
@@ -63,9 +64,13 @@ The following are tips & tricks I personally suggest. You can start from there, 
 * If your game uses a mouse and is being erratically press  **Left Analog Trigger** + **Y** to capture the mouse. 
 
 ## Limitations
-Compared to eXoDOS that uses LaunchBox, this project only does a tiny amount of what eXoDOS is capable. eXoDOS is a huge catalog that not only includes the games, but the user manuals, art, magazines, etc. Also eXoDOS support several emulators, including SCUMMVM, and different versions of DOSBox.
+Compared to eXoDOS that uses LaunchBox, this project only does a tiny amount of what eXoDOS is capable. eXoDOS is a huge catalog that not only includes the games, but the user manuals, art, magazines, lots of extras, etc. Also eXoDOS supports several emulators, including SCUMMVM, and different versions of DOSBox.
 
 DOSVault will launch every game using DOSBox-X at this time (but all of them should work!).
+
+While in most of the games you can choose the graphics card, a few games will be forced to MCGA/VGA. This is because some eXoDOS games have external .bat files that only work on Windows to choose the graphics card. Most games have a _run.bat_ file that runs inside the emulator that let you choose graphics and sound cards and those work fine.
+
+Single player games should work fine, but multiplayer games that rely on network will probably fail.
 
 
 ## Bugs
@@ -95,8 +100,10 @@ At the end of the build process you will have a *com.yappari.DOSVault.flatpak* f
 Both Pegasus and DOSBox-X have been patched to look/work better on a Steam Deck. Patches included are:
 * **Pegasus**
    * Ability to run commands inside the same flatpak (this allows the emulator to be executed).
+   * Assigned UNIX signal SIGHUP to rescan the database.
 * **DOSBox-X**
    * Simple notifications were implemented (so the user knows when he changes slots and saves to/loads from them).
    * Changed Button Mapper resolution from 640x480 to 1280x800 (because it was too tiny on the Deck).
+
 
 

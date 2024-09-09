@@ -37,6 +37,12 @@ read_config() {
     exo_dir="${dosvault_dir}/eXoDOS/eXo"
     xml_file="${dosvault_dir}/eXoDOS/DOS.metadata.pegasus.txt"
     installed_xml_file="${dosvault_dir}/eXoDOS/Installed.metadata.pegasus.txt"
+    
+    if [ -f "${lib_dir}/version.sh" ]; then
+        source "${lib_dir}/version.sh"
+    else
+        dosvault_version="unknown"
+    fi
 }
 
 save_setting() {
@@ -81,14 +87,52 @@ update_grid() {
     done
 }
 
-upgrade_version() {
+rebuild_installed_xml() {
+    printf "collection: Installed\nfile: ${lib_dir}/adminTool\n" >${installed_xml_file}
+    for d in $(find ${exodos_dir} -maxdepth 1 -mindepth 1 -type d | grep -Ev '/!dos$')
+    do
+        printf "file: %s/!dos/%s/dosbox.conf\n" ${exodos_dir} $(basename $d) >>${installed_xml_file}
+    done        
+}
+
+convert_xml_to_pegasus() {
+    printf "\n\n\033[2A"
+    printf "Converting ${Cyan}LaunchBox XML file${Color_Off} to ${Green}Pegasus Metadata format${Color_Off}... "
+    $lib_dir/xml2pegasus "${dosvault_dir}/eXoDOS/xml/all/MS-DOS.xml" "${dosvault_dir}" "${lib_dir}/launch.sh" >$xml_file
+    sed "s@admin.sh@${lib_dir}/adminTool@" ${res_dir}/admin.txt | sed "s/@VERSION@/${dosvault_version}/" >>${xml_file}
+    printf "asset.box_front: /app/grid/%s_p.png\nfile: %s/adminTool\n" ${FLATPAK_ID} ${lib_dir} >>${xml_file}
+
+    rebuild_installed_xml
+    printf "\n${Green}Pegasus Metadata file created successfully!${Color_Off}\n"
+}
+
+check_if_last_version() {
     if [ -f "${xml_file}" ]; then
         if [ ! -f "${dosvault_dir}/VERSION" ]; then
             touch "${dosvault_dir}/VERSION"
         fi
 
         last_version=$(cat "${dosvault_dir}/VERSION")
-        if [ "{$last_version}" != "${dosvault_version}" ]; then
+        if [ "${last_version}" != "${dosvault_version}" ]; then
+            echo 1
+            return
+        fi
+    fi
+    echo 0
+}
+
+upgrade_version() {
+    if [ -f "${xml_file}" ]; then
+        if [ ! -f "${dosvault_dir}/VERSION" ]; then
+            touch "${dosvault_dir}/VERSION"
+        fi
+
+        local last_version=$(cat "${dosvault_dir}/VERSION")
+        if [ "${last_version}" != "${dosvault_version}" ]; then
+        
+            # Upgrade needed
+            convert_xml_to_pegasus
+        
             sed -i "s/game: DOSVault Configuration Tool.*/game: DOSVault Configuration Tool v${dosvault_version}/" ${xml_file}
             echo "${dosvault_version}" >"${dosvault_dir}/VERSION"
         fi
@@ -114,8 +158,3 @@ xterm_mode="${xterm_mode} -geom 85x26 -fg gray -bg black -fa DejaVuSansMono -fs 
 
 read_config
 
-if [ -f "${lib_dir}/version.sh" ]; then
-    source "${lib_dir}/version.sh"
-else
-    dosvault_version="unknown"
-fi

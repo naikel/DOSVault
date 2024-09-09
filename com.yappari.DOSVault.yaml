@@ -169,6 +169,7 @@ modules:
     build-commands:
       - install -Dm644 ${FLATPAK_ID}.desktop ${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop
       - install -Dm644 ${FLATPAK_ID}.png ${FLATPAK_DEST}/share/icons/hicolor/128x128/apps
+      - install -Dm644 ${FLATPAK_ID}.metainfo.xml ${FLATPAK_DEST}/share/metainfo
       - install -Dm755 run.sh ${FLATPAK_DEST}/bin
       - install -Dm755 steam ${FLATPAK_DEST}/bin
       - mkdir -p ${FLATPAK_DEST}/resources ${FLATPAK_DEST}/libexec ${FLATPAK_DEST}/grid
@@ -193,6 +194,8 @@ modules:
         path: com.yappari.DOSVault.desktop
       - type: file
         path: com.yappari.DOSVault.png
+      - type: file
+        path: com.yappari.DOSVault.metainfo.xml
       - type: file
         path: run.sh
       - type: dir

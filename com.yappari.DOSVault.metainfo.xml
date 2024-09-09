@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.yappari.DOSVault</id>
+  <name>DOSVault</name>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <summary>eXoDOS port for Steam Deck/Linux using Pegasus as the frontend</summary>
+  <description>
+    <p>DOSVault is a port of eXoDOS that's optimized for the Steam Deck but it can also be run on any Linux distro. It uses Pegasus as a frontend and DOSBox-X as the emulator. It's basically a group of scripts that will allow you to have an eXoDOS-like installation in your Steam Deck/Linux box.</p>
+    <p>DOSVault behaves like the eXoDOS Lite version, and the games are installed on-demand.</p>
+  </description>
+  <content_rating type="oars-1.1" />
+
+  <launchable type="desktop-id">com.yappari.DOSVault.desktop</launchable>
+  <provides>
+    <binary>run.sh</binary>
+  </provides>
+
+  <screenshots>
+    <screenshot type="default"><image>https://raw.githubusercontent.com/naikel/DOSVault/master/screenshots/pegasus.jpg</image></screenshot>
+    <screenshot><image>https://raw.githubusercontent.com/naikel/DOSVault/master/screenshots/install.jpg</image></screenshot>
+    <screenshot><image>https://raw.githubusercontent.com/naikel/DOSVault/master/screenshots/configuration_tool.jpg</image></screenshot>
+  </screenshots>
+  <categories>
+    <category>Game</category>
+    <category>Player</category>
+  </categories>
+  <keywords>
+    <keyword>pegasus</keyword>
+    <keyword>dosbox</keyword>
+    <keyword>emulator</keyword>
+    <keyword>retro</keyword>
+    <keyword>game</keyword>
+    <keyword>frontend</keyword>
+    <keyword>player</keyword>
+  </keywords>
+
+  <url type="homepage">https://github.com/naikel/DOSVault</url>
+  <url type="bugtracker">https://github.com/naikel/DOSVault/issues</url>
+  <developer_name>TheScorpius666</developer_name>
+
+  <releases>
+    <release date="2024-09-05" version="0.3a" />
+  </releases>
+</component>

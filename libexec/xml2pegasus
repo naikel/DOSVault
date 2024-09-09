@@ -32,12 +32,36 @@ def print_collection(launch_file_path):
     print("collection: DOS")
     print("launch: " + launch_file_path + " {file.path}")
     print()
+    
+
+def get_all_dirs(directory):
+    all_dirs = []
+    for entry in os.scandir(directory):
+        if entry.is_dir():
+            all_dirs.append(os.path.join(directory, entry.name))
+            
+    return all_dirs
 
 
 def get_all_files(directory):
+    all_files = []
     for root, dirs, files in os.walk(directory):
         for filename in files:
-            all_image_files.append(os.path.join(root, filename))
+            all_files.append(os.path.join(root, filename))
+            
+    return all_files
+    
+    
+def get_case_sensitive_file(root, path):
+    file = os.path.join(root, path)
+    if os.path.exists(os.path.join(root, path)):
+        return path
+        
+    file_c = file.casefold()
+    for d in all_metadata_dirs:
+        if d.casefold() == os.path.dirname(file_c):
+            result = re.sub(root + "/", "", os.path.join(d, os.path.basename(path)))
+            return result
 
            
 def search_files(target_string):
@@ -81,6 +105,7 @@ if len(sys.argv) != 4:
    
 xml_file = sys.argv[1]
 dosvault_dir = sys.argv[2]
+exodos_dir = dosvault_dir + "/eXoDOS"
 launch_file_path = sys.argv[3]
 
 tree = ET.parse(xml_file)
@@ -88,14 +113,15 @@ root = tree.getroot()
 
 print_collection(launch_file_path)
 
-get_all_files(dosvault_dir + "/eXoDOS/Images/")
+all_image_files = get_all_files(exodos_dir + "/Images/")
+all_metadata_dirs = get_all_dirs(exodos_dir + "/eXo/eXoDOS/!dos")
 i = 0
 print("\033[s", file=sys.stderr)
 for game in root.findall("Game"):
     title = game.find("Title").text
     dt_object = datetime.fromisoformat(game.find("ReleaseDate").text)
     year = dt_object.year
-    file = game.find("RootFolder").text.replace("\\","/") + '/dosbox.conf'
+    file = get_case_sensitive_file(exodos_dir, game.find("RootFolder").text.replace("\\","/") + '/dosbox.conf')
     developer = game.find("Developer").text
     publisher = game.find("Publisher").text
     genre = game.find("Genre").text

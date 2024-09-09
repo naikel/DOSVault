@@ -62,7 +62,7 @@ if [ -d "${game_install_dir}" ]; then
         resolution=$(flatpak-spawn --host xrandr -display :0 | head -1 | grep -Eo "current [0-9]+ x [0-9]+" | sed 's/current//' | tr -d [:space:])
         dosbox_options="-nomenu -set autolock=true -set windowresolution=${resolution}"
     else
-        dosbox_options="-fullscreen"
+        dosbox_options="-set autolock=true"
     fi
     
     dosbox-x -conf ${dosbox_conf}.DOSVault -defaultdir "${exo_dir}" -exit -set saveremark=false -set captures="${game_install_dir}/save" ${dosbox_options}

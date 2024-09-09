@@ -167,24 +167,7 @@ download_metadata() {
     fi
 }
 
-convert_xml_to_pegasus() {
-    if [ ! -f "$xml_file" ]; then
-        clear
-        printf "Converting ${Cyan}LaunchBox XML file${Color_Off} to ${Green}Pegasus Metadata format${Color_Off}... "
-        $lib_dir/xml2pegasus "${dosvault_dir}/eXoDOS/xml/all/MS-DOS.xml" "${dosvault_dir}" "${lib_dir}/launch.sh" >$xml_file
-        head -2 $xml_file | sed s/DOS/Installed/ >${installed_xml_file}
-        printf "file: ${lib_dir}/adminTool\n" >>${installed_xml_file}
-        sed "s@admin.sh@${lib_dir}/adminTool@" ${res_dir}/admin.txt | sed "s/@VERSION@/${dosvault_version}/" >>${xml_file}
-        printf "asset.box_front: /app/grid/${FLATPAK_ID}_p.png\n" >>${xml_file}
-        printf "\n${Green}Pegasus Metadata file created successfully!${Color_Off}\n"
-        pegasus_dir="$HOME/.var/app/${FLATPAK_ID}/config/pegasus-frontend"
-        mkdir -p ${pegasus_dir}
-        echo "${dosvault_dir}/eXoDOS" > ${pegasus_dir}/game_dirs.txt
-    fi
-}
-
 copy_resources() {
-
     if [ ! -f "${dosvault_dir}/mapper-dosbox-x.map" ]; then
         cp "${res_dir}/mapper-dosbox-x.map" "${dosvault_dir}/mapper-dosbox-x.map"
     fi
@@ -229,8 +212,12 @@ install_DOSVault() {
     
     convert_xml_to_pegasus
     
-    upgrade_version
-
+    pegasus_dir="$HOME/.var/app/${FLATPAK_ID}/config/pegasus-frontend"
+    mkdir -p ${pegasus_dir}
+    echo "${dosvault_dir}/eXoDOS" > ${pegasus_dir}/game_dirs.txt
+    
+    sed -i "s/game: DOSVault Configuration Tool.*/game: DOSVault Configuration Tool v${dosvault_version}/" ${xml_file}
+    echo "${dosvault_version}" >"${dosvault_dir}/VERSION"
 }
 
 install_DOSVault
