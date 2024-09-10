@@ -20,6 +20,8 @@ source ${lib_dir}/global.sh
 
 ############################################ END-INIT
 
+printf "DOSVault version %s\n" ${dosvault_version}
+
 # Check if DOSVault is installed properly
 if [ ! -f $xml_file ]; then
     # Install DOSVault

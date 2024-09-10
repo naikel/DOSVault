@@ -184,6 +184,7 @@ modules:
       - install -Dm755 format.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 launch.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 install.sh ${FLATPAK_DEST}/libexec
+      - install -Dm755 upgrade.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 install_game.sh ${FLATPAK_DEST}/libexec
       - install -Dm755 adminTool ${FLATPAK_DEST}/libexec
       - install -Dm755 version.sh ${FLATPAK_DEST}/libexec

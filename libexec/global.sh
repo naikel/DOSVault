@@ -113,7 +113,9 @@ check_if_last_version() {
         fi
 
         last_version=$(cat "${dosvault_dir}/VERSION")
+        printf "Installed DOSVault version: %s\n" ${last_version} >/dev/stderr
         if [ "${last_version}" != "${dosvault_version}" ]; then
+            printf "An upgrade is needed\n" >/dev/stderr
             echo 1
             return
         fi
